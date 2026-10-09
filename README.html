@@ -1,0 +1,446 @@
+<h1 id="hep-pipeline-env">hep-pipeline-env</h1>
+<p>A Docker/Apptainer environment for running a high-energy physics
+Monte Carlo pipeline: <strong>MadGraph → MadSpin → Pythia →
+Rivet</strong></p>
+<p>This repository supports two deployment targets:</p>
+<ul>
+<li><strong><a href="#apptainer">Apptainer (HPC)</a></strong> — for HPC
+clusters where Docker is unavailable (e.g. Aristotle)</li>
+<li><strong><a href="#docker">Docker</a></strong> — for local
+workstations and CI</li>
+</ul>
+<p>Both targets share the same <code>compile_all.sh</code> build script
+and <code>mg5_data/</code> workspace layout.</p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#apptainer">Apptainer (HPC)</a>
+<ul>
+<li><a href="#hpc-specific-files">HPC-specific files</a></li>
+<li><a href="#first-time-setup-bootstrap">First-time setup
+(bootstrap)</a></li>
+<li><a href="#day-to-day-interactive-use">Day-to-day interactive
+use</a></li>
+<li><a href="#running-the-pipeline-with-sbatch">Running the pipeline
+with sbatch</a></li>
+<li><a href="#key-differences-from-docker">Key differences from
+Docker</a></li>
+</ul></li>
+<li><a href="#mg-pipeline">mg-pipeline</a>
+<ul>
+<li><a href="#setup">Setup</a></li>
+<li><a href="#running-interactively">Running interactively</a></li>
+<li><a href="#running-as-a-batch-job">Running as a batch job</a></li>
+</ul></li>
+<li><a href="#docker">Docker</a>
+<ul>
+<li><a href="#prerequisites">Prerequisites</a></li>
+<li><a href="#how-docker-works-here-read-this-first">How Docker works
+here (read this first)</a></li>
+<li><a href="#quick-start">Quick Start</a></li>
+<li><a href="#manual-alternative-to-bootstrapsh">Manual alternative to
+bootstrap.sh</a></li>
+<li><a href="#file-permissions-puid--pgid">File Permissions (PUID /
+PGID)</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul></li>
+</ul>
+<hr />
+<h2 id="apptainer">Apptainer</h2>
+<p>Docker is not available on the Aristotle HPC. Apptainer (formerly
+Singularity) is provided instead and works with the same
+<code>compile_all.sh</code> workflow.</p>
+<blockquote>
+<p><strong>Aristotle-specific assumption:</strong>
+<code>hpc_run.sh</code> and <code>hpc_pipeline_job.sh</code> are tuned
+for Aristotle, where the user’s home directory is NFS-mounted and
+writable inside the container. This means
+<code>pip install --user</code> and MadGraph’s own internal package
+installs work correctly without extra configuration. On other HPC
+systems where the home directory is read-only inside the container, you
+may need to set <code>PYTHONUSERBASE</code> to a writable path or
+install packages to a custom <code>--target</code> directory.</p>
+</blockquote>
+<h3 id="hpc-specific-files">HPC-specific files</h3>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 60%" />
+</colgroup>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>madgraph.def</code></td>
+<td>Apptainer definition file (equivalent of
+<code>Dockerfile</code>)</td>
+</tr>
+<tr>
+<td><code>hpc_bootstrap.sh</code></td>
+<td>One-time setup: builds <code>.sif</code> and compiles the HEP
+stack</td>
+</tr>
+<tr>
+<td><code>hpc_run.sh</code></td>
+<td>Interactive shell entry (equivalent of <code>run.sh</code>)</td>
+</tr>
+<tr>
+<td><code>hpc_pipeline_job.sh</code></td>
+<td>Batch job template for running the full pipeline via
+<code>mg-pipeline</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="first-time-setup-bootstrap">First-time setup (bootstrap)</h3>
+<p>Transfer the repository to your HPC home directory, then run the
+bootstrap <strong>directly on the login node</strong> :</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> hep-pipeline-env</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">chmod</span> +x hpc_bootstrap.sh hpc_run.sh hpc_pipeline_job.sh</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> logs</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> hpc_bootstrap.sh</span></code></pre></div>
+<p>Alternatively, submit as a batch job (useful if the build is very
+long):</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> hpc_bootstrap.sh</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Monitor with:</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">tail</span> <span class="at">-f</span> logs/bootstrap_<span class="op">&lt;</span>jobid<span class="op">&gt;</span>.out</span></code></pre></div>
+<p><code>hpc_bootstrap.sh</code> will: 1. Build
+<code>madgraph.sif</code> from <code>madgraph.def</code> using
+<code>apptainer build --fakeroot</code> (~5 min) 2. Create
+<code>mg5_data/</code> if it does not exist 3. Run
+<code>compile_all.sh</code> inside the container to compile all HEP
+libraries (~60–120 min)</p>
+<p>When it finishes, <code>mg5_data/.bootstrap_done</code> is created.
+Re-running the script skips steps that are already done.</p>
+<h3 id="day-to-day-interactive-use">Day-to-day interactive use</h3>
+<p>After bootstrap completes, enter the container with:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./hpc_run.sh</span></span></code></pre></div>
+<p>This opens an interactive shell inside the Ubuntu 22.04 container. On
+entry, source the environment:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> /madgraph/compile_all.sh</span></code></pre></div>
+<p>This restores <code>PATH</code>, <code>LD_LIBRARY_PATH</code>, and
+all other HEP environment variables for the session. You only need to do
+this once per shell — all subprocesses (including pipeline stages) will
+inherit the correct environment.</p>
+<p>You are automatically your HPC user inside the container — no UID
+remapping is needed (Apptainer handles this natively).</p>
+<h3 id="running-the-pipeline-with-sbatch">Running the pipeline with
+sbatch</h3>
+<p><code>hpc_pipeline_job.sh</code> is a ready-made sbatch template that
+runs the full MadGraph→MadSpin→Pythia→Rivet pipeline inside the
+container using <code>mg-pipeline</code>. See the <a
+href="#mg-pipeline">mg-pipeline section</a> below for prerequisites.</p>
+<p>All arguments after the script name are forwarded verbatim to
+<code>mg-pipeline/run.py</code>:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> logs</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the full pipeline</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> hpc_pipeline_job.sh <span class="at">--stages</span> madgraph,madspin,pythia,rivet</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Skip Rivet, run quietly</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> hpc_pipeline_job.sh <span class="at">--skip-rivet</span> <span class="at">--quiet</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Resume an existing experiment</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> hpc_pipeline_job.sh <span class="at">--resume</span> <span class="at">--intermediate-dir</span> /madgraph/Experiments_2</span></code></pre></div>
+<p>The job sources <code>compile_all.sh</code> automatically, so no
+manual <code>source</code> is needed in batch mode.</p>
+<h3 id="key-differences-from-docker">Key differences from Docker</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th></th>
+<th>Docker</th>
+<th>Apptainer (HPC)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Image file</td>
+<td>Layers in daemon</td>
+<td><code>madgraph.sif</code> (single file)</td>
+</tr>
+<tr>
+<td>Build image</td>
+<td><code>docker compose build</code></td>
+<td><code>bash hpc_bootstrap.sh</code> (or <code>sbatch</code>)</td>
+</tr>
+<tr>
+<td>Bootstrap HEP stack</td>
+<td><code>./bootstrap.sh</code></td>
+<td><code>bash hpc_bootstrap.sh</code> (or <code>sbatch</code>)</td>
+</tr>
+<tr>
+<td>Enter environment</td>
+<td><code>./run.sh</code></td>
+<td><code>./hpc_run.sh</code></td>
+</tr>
+<tr>
+<td>User inside container</td>
+<td>Remapped via entrypoint</td>
+<td>Automatically your HPC user</td>
+</tr>
+<tr>
+<td>Persistent data</td>
+<td><code>mg5_data/</code> bind mount</td>
+<td>Same <code>mg5_data/</code> bind mount</td>
+</tr>
+<tr>
+<td>Run pipeline as batch job</td>
+<td>—</td>
+<td><code>sbatch hpc_pipeline_job.sh [args]</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="mg-pipeline">mg-pipeline</h2>
+<p><code>mg-pipeline</code> is a Python orchestration tool that drives
+the MadGraph→MadSpin→Pythia→Rivet pipeline. It is maintained in a
+separate repository and is not bundled here, but is designed to run
+inside this container environment.</p>
+<blockquote>
+<p><strong>Note:</strong> <code>mg-pipeline</code> is
+<strong>not</strong> cloned automatically. Clone it manually
+into <code>mg5_data/</code> (see below). Once the public URL is final,
+the automatic clone in <code>bootstrap.sh</code> /
+<code>hpc_bootstrap.sh</code> can be re-enabled (look for the
+<code>TODO</code> markers in those scripts).</p>
+</blockquote>
+<h3 id="setup">Setup</h3>
+<p>After bootstrap, clone <code>mg-pipeline</code> into
+<code>mg5_data/</code>:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="op">&lt;</span>your-mg-pipeline-repo<span class="op">&gt;</span> mg5_data/mg-pipeline</span></code></pre></div>
+<!-- TODO: restore the public URL once mg-pipeline is published.
+     Upstream: https://github.com/iakovts/mg-pipeline -->
+<p>The <code>mg5_data/</code> directory is bind-mounted as
+<code>/madgraph</code> inside the container, so the pipeline will be
+available at <code>/madgraph/mg-pipeline/</code> inside the
+container.</p>
+<p>You will also need your MadGraph scripts and MadSpin cards in the
+corresponding directories:</p>
+<pre><code>mg5_data/
+  madgraph_scripts/    # .txt scripts consumed by MadGraph
+  madspin_scripts/     # MadSpin decay card files
+  analysis/            # Rivet analysis .cc files
+  mg-pipeline/         # mg-pipeline checkout</code></pre>
+<h3 id="running-interactively">Running interactively</h3>
+<p>Inside the container (after
+<code>source /madgraph/compile_all.sh</code>):</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /madgraph</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> mg-pipeline/run.py <span class="at">--stages</span> madgraph,madspin,pythia,rivet</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> mg-pipeline/run.py <span class="at">--help</span>   <span class="co"># see all options</span></span></code></pre></div>
+<h3 id="running-as-a-batch-job">Running as a batch job</h3>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> hpc_pipeline_job.sh <span class="at">--stages</span> madgraph,madspin,pythia,rivet</span></code></pre></div>
+<p><code>hpc_pipeline_job.sh</code> handles all module loading,
+container entry, and environment setup automatically. Logs go to
+<code>logs/pipeline_&lt;jobid&gt;.out</code>.</p>
+<hr />
+<h2 id="docker">Docker</h2>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li><a href="https://docs.docker.com/get-docker/">Docker</a>
+(v20.10+)</li>
+<li><a href="https://docs.docker.com/compose/install/">Docker
+Compose</a> (v2+)</li>
+</ul>
+<h3 id="how-docker-works-here-read-this-first">How Docker works here
+(read this first)</h3>
+<p>If you have never used Docker, the mental model is simple:</p>
+<ul>
+<li>A <strong>container</strong> is a disposable, isolated Linux machine
+that runs on your computer. It is created from an <strong>image</strong>
+(a snapshot of the OS + tools).</li>
+<li>Your work lives in <strong><code>mg5_data/</code></strong> on your
+host machine. That folder is <em>bind-mounted</em> into the container at
+<code>/madgraph</code>, so anything you create inside the container is
+really being written to <code>mg5_data/</code> on your host.</li>
+<li>The container itself is <strong>throwaway</strong>. This project
+starts it with <code>docker compose run --rm</code>, so when you
+<code>exit</code>, the container is deleted — but <code>mg5_data/</code>
+(and everything in it) <strong>persists</strong>. Nothing is lost.</li>
+</ul>
+<p>So the workflow is always the same two commands:</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 31%" />
+<col style="width: 48%" />
+</colgroup>
+<thead>
+<tr>
+<th>When</th>
+<th>Command</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>First time only</strong></td>
+<td><code>./bootstrap.sh</code></td>
+<td>Builds the image and compiles the HEP stack (slow, one-off)</td>
+</tr>
+<tr>
+<td><strong>Every time after</strong></td>
+<td><code>./run.sh</code></td>
+<td>Re-enters the environment instantly (no recompile)</td>
+</tr>
+</tbody>
+</table>
+<p>You do <strong>not</strong> need to run <code>bootstrap.sh</code>
+again after the first time. Just use <code>./run.sh</code> whenever you
+want to work.</p>
+<h3 id="quick-start">Quick Start</h3>
+<h4 id="clone-the-repository">1. Clone the repository</h4>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="op">&lt;</span>repo-url<span class="op">&gt;</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> hep-pipeline-env</span></code></pre></div>
+<h4 id="first-time-only-run-the-bootstrap-script">2. First time only:
+run the bootstrap script</h4>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./bootstrap.sh</span></span></code></pre></div>
+<p>This creates <code>mg5_data/</code>, builds the Docker image, and
+starts the container for the first time. On this first entry the HEP
+stack is downloaded and compiled into <code>mg5_data/</code> —
+<strong>this takes a long time (roughly 1–2 hours)</strong> and only
+happens once. When it finishes, a marker file
+<code>mg5_data/.bootstrap_done</code> is written so future starts skip
+the compile.</p>
+<blockquote>
+<p><strong>Tip:</strong> You can leave it running and come back later.
+If it is interrupted, just run <code>./bootstrap.sh</code> again —
+completed steps are skipped.</p>
+</blockquote>
+<h4 id="exiting-the-container">3. Exiting the container</h4>
+<p>When you are done working, type:</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="bu">exit</span></span></code></pre></div>
+<p>This closes the shell and removes the container (because of
+<code>--rm</code>). Your files in <code>mg5_data/</code> are
+untouched.</p>
+<h4 id="re-entering-later">4. Re-entering later</h4>
+<p>To come back to the environment, run:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./run.sh</span></span></code></pre></div>
+<p>This starts a fresh container and restores the HEP environment
+automatically — no recompilation. You can run this as many times as you
+like.</p>
+<blockquote>
+<p><strong>Note:</strong> <code>./run.sh</code> will print a reminder if
+<code>mg-pipeline</code> has not been cloned yet (see the <a
+href="#mg-pipeline">mg-pipeline section</a>). That is only a hint — the
+environment still opens normally.</p>
+</blockquote>
+<h4 id="manual-recovery-or-reloading">5. Manual recovery or
+reloading</h4>
+<p>If you enter an already-running container with
+<code>docker compose exec</code>, or if you want to reload the
+environment manually, source the script inside the container:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> compile_all.sh</span></code></pre></div>
+<p>On first bootstrap this downloads and compiles (in order):</p>
+<ol type="1">
+<li><strong>ROOT</strong> — data analysis framework (precompiled
+binary)</li>
+<li><strong>MadGraph5_aMC@NLO</strong> — matrix element generator</li>
+<li><strong>LHAPDF</strong> — parton distribution function library</li>
+<li><strong>YODA</strong> — data analysis histogramming</li>
+<li><strong>FastJet</strong> + <strong>fjcontrib</strong> — jet
+clustering</li>
+<li><strong>HepMC3</strong> — event record format</li>
+<li><strong>Rivet</strong> — analysis framework</li>
+<li><strong>Pythia 8</strong> — parton shower / hadronisation</li>
+</ol>
+<p>The first compilation takes a while. Subsequent container starts
+reuse the compiled libraries in <code>mg5_data/</code> and restore the
+environment automatically. You can still re-source the script manually
+if needed:</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> compile_all.sh</span></code></pre></div>
+<blockquote>
+<p><strong>Tip:</strong> You can also call individual build functions
+after sourcing, e.g. <code>build_pythia</code>, to rebuild a single
+component.</p>
+</blockquote>
+<h3 id="manual-alternative-to-bootstrap.sh">Manual alternative to
+bootstrap.sh</h3>
+<p><code>./bootstrap.sh</code> is just a convenience wrapper. If you
+prefer to run the steps yourself (or need to debug one of them):</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> mg5_data          <span class="co"># create the workspace first (see note below)</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose build       <span class="co"># build the image</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose run <span class="at">--rm</span> madgraph_p3   <span class="co"># start the container (compiles on first run)</span></span></code></pre></div>
+<blockquote>
+<p><strong>Why create <code>mg5_data/</code> manually?</strong> Docker
+Compose auto-creates missing bind-mount directories as
+<code>root:root</code>. Creating it yourself (or letting
+<code>bootstrap.sh</code> do it) ensures it is owned by your user.</p>
+</blockquote>
+<h3 id="file-permissions-puid-pgid">File Permissions (PUID / PGID)</h3>
+<p>The container creates an internal user with UID/GID matching the
+<code>PUID</code>/<code>PGID</code> environment variables from
+<code>docker-compose.yml</code> (default: 1000). Files written to
+<code>mg5_data/</code> will be owned by this UID on the host, so you can
+read and edit them without <code>sudo</code>.</p>
+<p>Concretely, ownership is handled in three places:</p>
+<ol type="1">
+<li><code>bootstrap.sh</code> creates <code>mg5_data/</code> on the host
+as <strong>your</strong> user.</li>
+<li><code>entrypoint.sh</code> runs as root, creates the
+<code>madgraph</code> user with
+<code>UID=PUID</code>/<code>GID=PGID</code>, and <code>chown</code>s the
+<code>/madgraph</code> mount point to that user.</li>
+<li>All work runs via <code>gosu madgraph</code>, so every new file is
+owned by <code>PUID:PGID</code>.</li>
+</ol>
+<blockquote>
+<p><strong>Note:</strong> The <code>chown</code> in step 2 is
+<strong>not recursive</strong> — it only fixes the top-level
+<code>/madgraph</code> directory. Files left over from an older run that
+are already owned by <code>root</code> will not be repaired
+automatically. If you hit this, fix them once with
+<code>sudo chown -R "$(id -u):$(id -g)" mg5_data/</code>.</p>
+</blockquote>
+<p>To use a different UID/GID, edit <code>docker-compose.yml</code>:</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">environment</span><span class="kw">:</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> PUID=1001</span><span class="co">   # your host UID (run: id -u)</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> PGID=1001</span><span class="co">   # your host GID (run: id -g)</span></span></code></pre></div>
+<h3 id="project-structure">Project Structure</h3>
+<pre><code>.
+├── Dockerfile           # Image definition (Ubuntu 22.04 + build tools)
+├── docker-compose.yml   # Container configuration
+├── entrypoint.sh        # Creates non-root user from PUID/PGID
+├── compile_all.sh       # Downloads &amp; compiles all HEP libraries
+├── .dockerignore        # Excludes mg5_data from build context
+├── mg5_data/            # Persistent workspace (bind-mounted into container)
+└── README.md</code></pre>
+<h3 id="troubleshooting">Troubleshooting</h3>
+<p><strong>Permission denied on <code>mg5_data/</code> files:</strong>
+Check that <code>PUID</code>/<code>PGID</code> in
+<code>docker-compose.yml</code> match your host user. Run
+<code>id -u</code> and <code>id -g</code> to find your UID and GID.</p>
+<p><strong>Compilation fails mid-way:</strong> The script sources all
+build functions into your shell. You can re-run just the failing
+step:</p>
+<div class="sourceCode" id="cb19"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> compile_all.sh   <span class="co"># loads the functions</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="ex">build_pythia</span>             <span class="co"># re-run only Pythia</span></span></code></pre></div>
+<p><strong>Container lost environment after restart:</strong> Libraries
+persist in <code>mg5_data/</code>, but environment variables
+(<code>PATH</code>, <code>LD_LIBRARY_PATH</code>, etc.) don’t survive
+restarts. Re-source the script to restore them.</p>

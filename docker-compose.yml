@@ -1,0 +1,18 @@
+services:
+  madgraph_p3:
+    build: .
+    container_name: madgraph_p3
+    working_dir: /madgraph
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./mg5_data:/madgraph
+      - ./compile_all.sh:/madgraph/compile_all.sh
+    environment:
+      - LC_ALL=C
+      - DEBIAN_FRONTEND=noninteractive
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Athens
+
+

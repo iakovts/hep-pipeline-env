@@ -1,0 +1,60 @@
+# Apptainer definition file for the MadGraph HEP pipeline
+# Equivalent of the Dockerfile for use on HPCs where Docker is not available.
+#
+# Build (on Aristotle HPC with fakeroot enabled):
+#   module load gcc/14.2.0 apptainer/1.3.4
+#   apptainer build --fakeroot madgraph.sif madgraph.def
+#
+# Build (locally with root/sudo):
+#   sudo apptainer build madgraph.sif madgraph.def
+#
+# The image provides only the OS base and compiler toolchain.
+# All HEP libraries (MadGraph, Pythia, Rivet, etc.) are compiled at
+# first run by compile_all.sh and persist in the bind-mounted workspace.
+
+BootStrap: docker
+From: ubuntu:22.04
+
+%labels
+    Author mg-pipeline
+    Description Ubuntu 22.04 base for MadGraph/Pythia/Rivet HEP pipeline
+
+%environment
+    export LC_ALL=C
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Europe/Athens
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Europe/Athens
+
+    # -o APT::Sandbox::User=root prevents apt from dropping privileges to
+    # the _apt user, which fails when the container is built without a full
+    # subuid/subgid mapping (common on HPC fakeroot builds).
+    apt-get -o APT::Sandbox::User=root update
+    apt-get -o APT::Sandbox::User=root install -y --no-install-recommends \
+        gfortran \
+        g++ \
+        rsync \
+        make \
+        cmake \
+        python3 \
+        python3-pip \
+        python-is-python3 \
+        cython3 \
+        python3-dev \
+        wget \
+        ca-certificates \
+        vim \
+        git
+    rm -rf /var/lib/apt/lists/*
+
+%runscript
+    # Default entry: source the HEP environment and drop into bash.
+    # The working directory and compile_all.sh are expected to be
+    # provided via bind mount: --bind /path/to/repo:/madgraph
+    cd /madgraph
+    if [[ -f /madgraph/compile_all.sh ]]; then
+        source /madgraph/compile_all.sh
+    fi
+    exec bash "$@"
