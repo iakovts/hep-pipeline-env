@@ -1,4 +1,4 @@
-# Apptainer (HPC)
+## Apptainer (HPC)
 
 Docker is not available on the Aristotle HPC. Apptainer (formerly Singularity)
 is provided instead and works with the same `compile_all.sh` workflow.

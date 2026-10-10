@@ -2,25 +2,21 @@
 
 # hep-pipeline-env
 
+## Overview
+
 A Docker/Apptainer environment for running a high-energy physics Monte Carlo
 pipeline: **MadGraph → MadSpin → Pythia → Rivet**.
 
 This repository supports two deployment targets:
 
-- **[Apptainer (HPC)](docs/apptainer.md)** — for HPC clusters where Docker is unavailable (e.g. Aristotle)
-- **[Docker](docs/docker.md)** — for local workstations and CI
+- **[Apptainer (HPC)](#apptainer-hpc)** — for HPC clusters where Docker is unavailable (e.g. Aristotle)
+- **[Docker](#docker)** — for local workstations and CI
 
 Both targets share the same `compile_all.sh` build script and `mg5_data/`
 workspace layout.
-
-## Where to next
-
-- [Apptainer (HPC)](docs/apptainer.md) — build `.sif`, run on the cluster, batch jobs
-- [Docker](docs/docker.md) — first-time bootstrap and day-to-day use on a workstation
-- [Running the pipeline](docs/running-the-pipeline.md) — running `mg-pipeline` inside this environment
 - [Troubleshooting](docs/troubleshooting.md) — common issues
 
-# Apptainer (HPC)
+## Apptainer (HPC)
 
 Docker is not available on the Aristotle HPC. Apptainer (formerly Singularity)
 is provided instead and works with the same `compile_all.sh` workflow.
@@ -129,7 +125,7 @@ in batch mode.
 | Persistent data | `mg5_data/` bind mount | Same `mg5_data/` bind mount |
 | Run pipeline as batch job | — | `sbatch hpc_pipeline_job.sh [args]` |
 
-# Docker
+## Docker
 
 ## Prerequisites
 
@@ -295,7 +291,7 @@ environment:
 └── README.md
 ```
 
-# Running the pipeline
+## Running the pipeline
 
 !!! tip "Recommended — start with the mg-pipeline docs"
     The pipeline itself is documented in the
@@ -354,7 +350,7 @@ sbatch hpc_pipeline_job.sh --stages madgraph,madspin,pythia,rivet
 `hpc_pipeline_job.sh` handles all module loading, container entry, and
 environment setup automatically. Logs go to `logs/pipeline_<jobid>.out`.
 
-# Troubleshooting
+## Troubleshooting
 
 ## Permission denied on `mg5_data/` files
 

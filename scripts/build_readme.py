@@ -37,7 +37,7 @@ def rewrite_links(text: str) -> str:
 
 
 def main() -> None:
-    parts = [MARKER]
+    parts = [MARKER, "", "# hep-pipeline-env"]
     for name in ORDER:
         path = DOCS_DIR / name
         if not path.exists():

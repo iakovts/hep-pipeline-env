@@ -1,4 +1,4 @@
-# Troubleshooting
+## Troubleshooting
 
 ## Permission denied on `mg5_data/` files
 

@@ -1,4 +1,4 @@
-# Running the pipeline
+## Running the pipeline
 
 !!! tip "Recommended — start with the mg-pipeline docs"
     The pipeline itself is documented in the
