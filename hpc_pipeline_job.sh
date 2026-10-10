@@ -59,7 +59,7 @@ fi
 if [[ ! -f "$MG_PIPELINE" ]]; then
     echo "Error: mg-pipeline not found at $MG5_DATA_DIR/mg-pipeline/" >&2
     echo "Clone it first:" >&2
-    echo "  git clone <your-mg-pipeline-repo> mg5_data/mg-pipeline" >&2
+    echo "  git clone https://github.com/iakovts/mg-pipeline mg5_data/mg-pipeline" >&2
     exit 1
 fi
 

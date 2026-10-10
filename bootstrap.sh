@@ -4,10 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MG5_DATA_DIR="$SCRIPT_DIR/mg5_data"
 MG_PIPELINE_DIR="$MG5_DATA_DIR/mg-pipeline"
-# TODO: restore the automatic clone once the public mg-pipeline URL is final.
-# The clone is disabled for now (mirroring hpc_bootstrap.sh). Clone it manually
-# into mg5_data/mg-pipeline when needed.
-# MG_PIPELINE_REPO="https://github.com/iakovts/mg-pipeline"
+MG_PIPELINE_REPO="https://github.com/iakovts/mg-pipeline"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -26,17 +23,16 @@ fi
 
 mkdir -p "$MG5_DATA_DIR"
 
-# mg-pipeline is NOT cloned automatically (see note above). Clone it manually:
-#   git clone <your-mg-pipeline-repo> "$MG_PIPELINE_DIR"
-# TODO: restore the automatic clone once the public mg-pipeline URL is final.
-# if [[ -d "$MG_PIPELINE_DIR/.git" ]]; then
-#   echo "mg-pipeline already exists at $MG_PIPELINE_DIR"
-# elif [[ -e "$MG_PIPELINE_DIR" ]]; then
-#   echo "Error: $MG_PIPELINE_DIR exists but is not a git checkout." >&2
-#   exit 1
-# else
-#   git clone "$MG_PIPELINE_REPO" "$MG_PIPELINE_DIR"
-# fi
+# Clone mg-pipeline into the workspace (skipped if already present).
+if [[ -d "$MG_PIPELINE_DIR/.git" ]]; then
+  echo "mg-pipeline already exists at $MG_PIPELINE_DIR"
+elif [[ -e "$MG_PIPELINE_DIR" ]]; then
+  echo "Error: $MG_PIPELINE_DIR exists but is not a git checkout." >&2
+  exit 1
+else
+  echo "Cloning mg-pipeline into $MG_PIPELINE_DIR"
+  git clone "$MG_PIPELINE_REPO" "$MG_PIPELINE_DIR"
+fi
 
 cd "$SCRIPT_DIR"
 docker compose build

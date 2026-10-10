@@ -1,25 +1,21 @@
 # Running the pipeline
 
 `mg-pipeline` is a Python orchestration tool that drives the
-MadGraph→MadSpin→Pythia→Rivet pipeline. It is maintained in a
-separate repository and is not bundled here, but is designed to run inside
-this container environment.
+MadGraph→MadSpin→Pythia→Rivet pipeline. It is maintained in the
+[mg-pipeline](https://github.com/iakovts/mg-pipeline) repository and is designed
+to run inside this container environment.
 
-> **Note:** `mg-pipeline` is **not** cloned automatically. Clone it
-> manually into `mg5_data/` (see below). Once the public URL is final,
-> the automatic clone in `bootstrap.sh` / `hpc_bootstrap.sh` can be re-enabled
-> (look for the `TODO` markers in those scripts).
+> **Note:** `bootstrap.sh` / `hpc_bootstrap.sh` clone `mg-pipeline` into
+> `mg5_data/mg-pipeline` automatically. If you skipped that, or want a fresh
+> copy, clone it by hand:
 
 ## Setup
 
-After bootstrap, clone `mg-pipeline` into `mg5_data/`:
+Clone `mg-pipeline` into `mg5_data/`:
 
 ```bash
-git clone <your-mg-pipeline-repo> mg5_data/mg-pipeline
+git clone https://github.com/iakovts/mg-pipeline mg5_data/mg-pipeline
 ```
-
-<!-- TODO: restore the public URL once mg-pipeline is published.
-     Upstream: https://github.com/iakovts/mg-pipeline -->
 
 The `mg5_data/` directory is bind-mounted as `/madgraph` inside the container,
 so the pipeline will be available at `/madgraph/mg-pipeline/` inside the container.

@@ -33,7 +33,7 @@ You do **not** need to run `bootstrap.sh` again after the first time. Just use
 ### 1. Clone the repository
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/iakovts/hep-pipeline-env.git
 cd hep-pipeline-env
 ```
 

@@ -22,7 +22,7 @@ fi
 
 if [[ ! -d "$MG_PIPELINE_DIR" ]]; then
   echo "Note: mg-pipeline not found at $MG_PIPELINE_DIR — clone it manually to run the pipeline:" >&2
-  echo "  git clone <your-mg-pipeline-repo> $MG_PIPELINE_DIR" >&2
+  echo "  git clone https://github.com/iakovts/mg-pipeline $MG_PIPELINE_DIR" >&2
 fi
 
 cd "$SCRIPT_DIR"
