@@ -1,0 +1,5 @@
+#!/bin/sh
+# Regenerate README.md from docs/ and stage it.
+# Enable once per clone with:  git config core.hooksPath .githooks
+python3 scripts/build_readme.py || exit 1
+git add README.md

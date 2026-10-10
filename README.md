@@ -1,38 +1,26 @@
+<!-- Generated from docs/ by scripts/build_readme.py — do not edit directly. -->
+
 # hep-pipeline-env
 
-A Docker/Apptainer environment for running a high-energy physics Monte Carlo pipeline:
-**MadGraph → MadSpin → Pythia → Rivet**
+A Docker/Apptainer environment for running a high-energy physics Monte Carlo
+pipeline: **MadGraph → MadSpin → Pythia → Rivet**.
 
 This repository supports two deployment targets:
 
-- **[Apptainer (HPC)](#apptainer)** — for HPC clusters where Docker is unavailable (e.g. Aristotle)
-- **[Docker](#docker)** — for local workstations and CI
+- **[Apptainer (HPC)](docs/apptainer.md)** — for HPC clusters where Docker is unavailable (e.g. Aristotle)
+- **[Docker](docs/docker.md)** — for local workstations and CI
 
-Both targets share the same `compile_all.sh` build script and `mg5_data/` workspace layout.
+Both targets share the same `compile_all.sh` build script and `mg5_data/`
+workspace layout.
 
-## Table of Contents
+## Where to next
 
-- [Apptainer (HPC)](#apptainer)
-  - [HPC-specific files](#hpc-specific-files)
-  - [First-time setup (bootstrap)](#first-time-setup-bootstrap)
-  - [Day-to-day interactive use](#day-to-day-interactive-use)
-  - [Running the pipeline with sbatch](#running-the-pipeline-with-sbatch)
-  - [Key differences from Docker](#key-differences-from-docker)
-- [mg-pipeline](#mg-pipeline)
-  - [Setup](#setup)
-  - [Running interactively](#running-interactively)
-  - [Running as a batch job](#running-as-a-batch-job)
-- [Docker](#docker)
-  - [Prerequisites](#prerequisites)
-  - [How Docker works here (read this first)](#how-docker-works-here-read-this-first)
-  - [Quick Start](#quick-start)
-  - [Manual alternative to bootstrap.sh](#manual-alternative-to-bootstrapsh)
-  - [File Permissions (PUID / PGID)](#file-permissions-puid--pgid)
-  - [Troubleshooting](#troubleshooting)
+- [Apptainer (HPC)](docs/apptainer.md) — build `.sif`, run on the cluster, batch jobs
+- [Docker](docs/docker.md) — first-time bootstrap and day-to-day use on a workstation
+- [Running the pipeline](docs/running-the-pipeline.md) — running `mg-pipeline` inside this environment
+- [Troubleshooting](docs/troubleshooting.md) — common issues
 
----
-
-## Apptainer
+# Apptainer (HPC)
 
 Docker is not available on the Aristotle HPC. Apptainer (formerly Singularity)
 is provided instead and works with the same `compile_all.sh` workflow.
@@ -45,7 +33,7 @@ is provided instead and works with the same `compile_all.sh` workflow.
 > container, you may need to set `PYTHONUSERBASE` to a writable path or install
 > packages to a custom `--target` directory.
 
-### HPC-specific files
+## HPC-specific files
 
 | File | Purpose |
 |------|---------|
@@ -54,10 +42,10 @@ is provided instead and works with the same `compile_all.sh` workflow.
 | `hpc_run.sh` | Interactive shell entry (equivalent of `run.sh`) |
 | `hpc_pipeline_job.sh` | Batch job template for running the full pipeline via `mg-pipeline` |
 
-### First-time setup (bootstrap)
+## First-time setup (bootstrap)
 
 Transfer the repository to your HPC home directory, then run the bootstrap
-**directly on the login node** :
+**directly on the login node**:
 
 ```bash
 cd hep-pipeline-env
@@ -83,7 +71,7 @@ tail -f logs/bootstrap_<jobid>.out
 When it finishes, `mg5_data/.bootstrap_done` is created. Re-running the script
 skips steps that are already done.
 
-### Day-to-day interactive use
+## Day-to-day interactive use
 
 After bootstrap completes, enter the container with:
 
@@ -105,11 +93,11 @@ for the session. You only need to do this once per shell — all subprocesses
 You are automatically your HPC user inside the container — no UID remapping is needed
 (Apptainer handles this natively).
 
-### Running the pipeline with sbatch
+## Running the pipeline with sbatch
 
 `hpc_pipeline_job.sh` is a ready-made sbatch template that runs the full
 MadGraph→MadSpin→Pythia→Rivet pipeline inside the container using `mg-pipeline`.
-See the [mg-pipeline section](#mg-pipeline) below for prerequisites.
+See [running the pipeline](docs/running-the-pipeline.md) for prerequisites.
 
 All arguments after the script name are forwarded verbatim to `mg-pipeline/run.py`:
 
@@ -129,7 +117,7 @@ sbatch hpc_pipeline_job.sh --resume --intermediate-dir /madgraph/Experiments_2
 The job sources `compile_all.sh` automatically, so no manual `source` is needed
 in batch mode.
 
-### Key differences from Docker
+## Key differences from Docker
 
 | | Docker | Apptainer (HPC) |
 |---|---|---|
@@ -141,74 +129,14 @@ in batch mode.
 | Persistent data | `mg5_data/` bind mount | Same `mg5_data/` bind mount |
 | Run pipeline as batch job | — | `sbatch hpc_pipeline_job.sh [args]` |
 
----
+# Docker
 
-## mg-pipeline
-
-`mg-pipeline` is a Python orchestration tool that drives the
-MadGraph→MadSpin→Pythia→Rivet pipeline. It is maintained in a
-separate repository and is not bundled here, but is designed to run inside
-this container environment.
-
-> **Note:** `mg-pipeline` is **not** cloned automatically. Clone it
-> manually into `mg5_data/` (see below). Once the public URL is final,
-> the automatic clone in `bootstrap.sh` / `hpc_bootstrap.sh` can be re-enabled
-> (look for the `TODO` markers in those scripts).
-
-### Setup
-
-After bootstrap, clone `mg-pipeline` into `mg5_data/`:
-
-```bash
-git clone <your-mg-pipeline-repo> mg5_data/mg-pipeline
-```
-
-<!-- TODO: restore the public URL once mg-pipeline is published.
-     Upstream: https://github.com/iakovts/mg-pipeline -->
-
-The `mg5_data/` directory is bind-mounted as `/madgraph` inside the container,
-so the pipeline will be available at `/madgraph/mg-pipeline/` inside the container.
-
-You will also need your MadGraph scripts and MadSpin cards in the corresponding
-directories:
-
-```
-mg5_data/
-  madgraph_scripts/    # .txt scripts consumed by MadGraph
-  madspin_scripts/     # MadSpin decay card files
-  analysis/            # Rivet analysis .cc files
-  mg-pipeline/         # mg-pipeline checkout
-```
-
-### Running interactively
-
-Inside the container (after `source /madgraph/compile_all.sh`):
-
-```bash
-cd /madgraph
-python mg-pipeline/run.py --stages madgraph,madspin,pythia,rivet
-python mg-pipeline/run.py --help   # see all options
-```
-
-### Running as a batch job
-
-```bash
-sbatch hpc_pipeline_job.sh --stages madgraph,madspin,pythia,rivet
-```
-
-`hpc_pipeline_job.sh` handles all module loading, container entry, and
-environment setup automatically. Logs go to `logs/pipeline_<jobid>.out`.
-
----
-
-## Docker
-
-### Prerequisites
+## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) (v20.10+)
 - [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
 
-### How Docker works here (read this first)
+## How Docker works here (read this first)
 
 If you have never used Docker, the mental model is simple:
 
@@ -231,16 +159,16 @@ So the workflow is always the same two commands:
 You do **not** need to run `bootstrap.sh` again after the first time. Just use
 `./run.sh` whenever you want to work.
 
-### Quick Start
+## Quick Start
 
-#### 1. Clone the repository
+### 1. Clone the repository
 
 ```bash
 git clone <repo-url>
 cd hep-pipeline-env
 ```
 
-#### 2. First time only: run the bootstrap script
+### 2. First time only: run the bootstrap script
 
 ```bash
 ./bootstrap.sh
@@ -255,7 +183,7 @@ written so future starts skip the compile.
 > **Tip:** You can leave it running and come back later. If it is interrupted,
 > just run `./bootstrap.sh` again — completed steps are skipped.
 
-#### 3. Exiting the container
+### 3. Exiting the container
 
 When you are done working, type:
 
@@ -266,7 +194,7 @@ exit
 This closes the shell and removes the container (because of `--rm`). Your files
 in `mg5_data/` are untouched.
 
-#### 4. Re-entering later
+### 4. Re-entering later
 
 To come back to the environment, run:
 
@@ -278,10 +206,10 @@ This starts a fresh container and restores the HEP environment automatically —
 no recompilation. You can run this as many times as you like.
 
 > **Note:** `./run.sh` will print a reminder if `mg-pipeline` has not been
-> cloned yet (see the [mg-pipeline section](#mg-pipeline)). That is only a
-> hint — the environment still opens normally.
+> cloned yet (see [running the pipeline](docs/running-the-pipeline.md)). That is only
+> a hint — the environment still opens normally.
 
-#### 5. Manual recovery or reloading
+### 5. Manual recovery or reloading
 
 If you enter an already-running container with `docker compose exec`, or if you
 want to reload the environment manually, source the script inside the container:
@@ -312,7 +240,7 @@ source compile_all.sh
 > **Tip:** You can also call individual build functions after sourcing, e.g.
 > `build_pythia`, to rebuild a single component.
 
-### Manual alternative to bootstrap.sh
+## Manual alternative to bootstrap.sh
 
 `./bootstrap.sh` is just a convenience wrapper. If you prefer to run the steps
 yourself (or need to debug one of them):
@@ -327,7 +255,7 @@ docker compose run --rm madgraph_p3   # start the container (compiles on first r
 > bind-mount directories as `root:root`. Creating it yourself (or letting
 > `bootstrap.sh` do it) ensures it is owned by your user.
 
-### File Permissions (PUID / PGID)
+## File Permissions (PUID / PGID)
 
 The container creates an internal user with UID/GID matching the `PUID`/`PGID`
 environment variables from `docker-compose.yml` (default: 1000). Files written
@@ -354,7 +282,7 @@ environment:
   - PGID=1001   # your host GID (run: id -g)
 ```
 
-### Project Structure
+## Project Structure
 
 ```
 .
@@ -367,13 +295,71 @@ environment:
 └── README.md
 ```
 
-### Troubleshooting
+# Running the pipeline
 
-**Permission denied on `mg5_data/` files:**
+`mg-pipeline` is a Python orchestration tool that drives the
+MadGraph→MadSpin→Pythia→Rivet pipeline. It is maintained in a
+separate repository and is not bundled here, but is designed to run inside
+this container environment.
+
+> **Note:** `mg-pipeline` is **not** cloned automatically. Clone it
+> manually into `mg5_data/` (see below). Once the public URL is final,
+> the automatic clone in `bootstrap.sh` / `hpc_bootstrap.sh` can be re-enabled
+> (look for the `TODO` markers in those scripts).
+
+## Setup
+
+After bootstrap, clone `mg-pipeline` into `mg5_data/`:
+
+```bash
+git clone <your-mg-pipeline-repo> mg5_data/mg-pipeline
+```
+
+<!-- TODO: restore the public URL once mg-pipeline is published.
+     Upstream: https://github.com/iakovts/mg-pipeline -->
+
+The `mg5_data/` directory is bind-mounted as `/madgraph` inside the container,
+so the pipeline will be available at `/madgraph/mg-pipeline/` inside the container.
+
+You will also need your MadGraph scripts and MadSpin cards in the corresponding
+directories:
+
+```
+mg5_data/
+  madgraph_scripts/    # .txt scripts consumed by MadGraph
+  madspin_scripts/     # MadSpin decay card files
+  analysis/            # Rivet analysis .cc files
+  mg-pipeline/         # mg-pipeline checkout
+```
+
+## Running interactively
+
+Inside the container (after `source /madgraph/compile_all.sh`):
+
+```bash
+cd /madgraph
+python mg-pipeline/run.py --stages madgraph,madspin,pythia,rivet
+python mg-pipeline/run.py --help   # see all options
+```
+
+## Running as a batch job
+
+```bash
+sbatch hpc_pipeline_job.sh --stages madgraph,madspin,pythia,rivet
+```
+
+`hpc_pipeline_job.sh` handles all module loading, container entry, and
+environment setup automatically. Logs go to `logs/pipeline_<jobid>.out`.
+
+# Troubleshooting
+
+## Permission denied on `mg5_data/` files
+
 Check that `PUID`/`PGID` in `docker-compose.yml` match your host user. Run
 `id -u` and `id -g` to find your UID and GID.
 
-**Compilation fails mid-way:**
+## Compilation fails mid-way
+
 The script sources all build functions into your shell. You can re-run just
 the failing step:
 
@@ -382,35 +368,19 @@ source compile_all.sh   # loads the functions
 build_pythia             # re-run only Pythia
 ```
 
-**Container lost environment after restart:**
+## Container lost environment after restart
+
 Libraries persist in `mg5_data/`, but environment variables (`PATH`,
 `LD_LIBRARY_PATH`, etc.) don't survive restarts. Re-source the script to
-restore them.
+restore them:
 
-## Disclaimer
+```bash
+source compile_all.sh
+```
 
-`hep-pipeline-env` is an independent container/environment project. It is **not**
-part of, affiliated with, endorsed by, or supported by the developers of the
-software it downloads and compiles. In particular, this project builds:
+## On the HPC (Apptainer)
 
-- [MadGraph5_aMC@NLO](https://launchpad.net/mg5amcnlo) — event generation (MadSpin
-  is distributed as part of it; see [arXiv:1307.1694](https://arxiv.org/abs/1307.1694))
-- [PYTHIA](https://pythia.org/) — parton shower, hadronization and decays
-- [Rivet](https://rivet.hepforge.org/) — analyses and histogramming
-- plus supporting libraries (ROOT, LHAPDF, YODA, FastJet, fjcontrib, HepMC3)
-
-The build scripts fetch the above from their official sources and compile them
-inside the container; nothing from those projects is vendored in this repository,
-and each remains under its own license. Please report problems with the tools
-themselves to their own bug trackers. Issues with this environment belong in this
-repository.
-
-## Citing
-
-If you use this environment in academic work, please cite the underlying tools as
-requested by their authors (see links above), in addition to this repository.
-
-## License
-
-GNU GPL v3.0 or later — see [LICENSE](LICENSE).
-
+On Aristotle the user's home directory is writable inside the container, so
+`pip install --user` works without extra configuration. On other HPC systems
+with a read-only home directory, set `PYTHONUSERBASE` to a writable path (or
+install to a custom `--target` directory) before installing packages.
