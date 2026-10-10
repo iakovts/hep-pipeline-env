@@ -22,7 +22,8 @@
 #   1. Loads the Apptainer module
 #   2. Builds madgraph.sif from madgraph.def (if not already built)
 #   3. Creates mg5_data/ (if missing)
-#   4. (mg-pipeline is NOT cloned automatically — clone it manually, see below)
+#   4. Clones mg-pipeline into mg5_data/ (default; opt out with --no-mg-pipeline
+#      or CLONE_MG_PIPELINE=0)
 #   5. Runs compile_all.sh inside the container to build all HEP libraries
 #
 # After this job completes successfully, use hpc_run.sh for day-to-day use.
@@ -36,6 +37,16 @@ DEF="$SCRIPT_DIR/madgraph.def"
 MG5_DATA_DIR="$SCRIPT_DIR/mg5_data"
 MG_PIPELINE_DIR="$MG5_DATA_DIR/mg-pipeline"
 MG_PIPELINE_REPO="https://github.com/iakovts/mg-pipeline"
+
+# mg-pipeline is cloned into the workspace by default. Opt out with
+#   CLONE_MG_PIPELINE=0 bash hpc_bootstrap.sh   (or pass --no-mg-pipeline)
+CLONE_MG_PIPELINE="${CLONE_MG_PIPELINE:-1}"
+for arg in "$@"; do
+  case "$arg" in
+    --no-mg-pipeline) CLONE_MG_PIPELINE=0 ;;
+    --with-mg-pipeline) CLONE_MG_PIPELINE=1 ;;
+  esac
+done
 # compile_all.sh writes .bootstrap_done to its BASEDIR (= mg5_data/ inside container)
 MARKER="$MG5_DATA_DIR/.bootstrap_done"
 
@@ -71,12 +82,11 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Clone mg-pipeline  (disabled — clone manually when needed)
+# 4. Clone mg-pipeline into the workspace (default; skipped if already present)
 # ---------------------------------------------------------------------------
-# TODO: restore the automatic clone once the public mg-pipeline URL is final.
-# if [[ -d "$MG_PIPELINinto the workspace (skipped if already present)
-# ---------------------------------------------------------------------------
-if [[ -d "$MG_PIPELINE_DIR/.git" ]]; then
+if [[ "$CLONE_MG_PIPELINE" != "1" ]]; then
+    echo "[3/4] Skipping mg-pipeline clone (CLONE_MG_PIPELINE=0)."
+elif [[ -d "$MG_PIPELINE_DIR/.git" ]]; then
     echo "[3/4] mg-pipeline already cloned — skipping."
 elif [[ -e "$MG_PIPELINE_DIR" ]]; then
     echo "Error: $MG_PIPELINE_DIR exists but is not a git checkout." >&2
@@ -84,7 +94,10 @@ elif [[ -e "$MG_PIPELINE_DIR" ]]; then
 else
     echo "[3/4] Cloning mg-pipeline..."
     git clone "$MG_PIPELINE_REPO" "$MG_PIPELINE_DIR"
-5. Run compile_all.sh inside the container to build all HEP libraries
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Run compile_all.sh inside the container to build all HEP libraries
 # ---------------------------------------------------------------------------
 if [[ -f "$MARKER" ]]; then
     echo "[4/4] .bootstrap_done marker found — HEP libraries already compiled."

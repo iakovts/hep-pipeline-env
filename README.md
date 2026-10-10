@@ -297,6 +297,13 @@ environment:
 
 # Running the pipeline
 
+!!! tip "Recommended — start with the mg-pipeline docs"
+    The pipeline itself is documented in the
+    [**mg-pipeline** repository](https://github.com/iakovts/mg-pipeline).
+    **Go there for actually running it** (cards, stages, resume mode). This page
+    only covers the environment-specific bits: where the checkout lives and how
+    it maps into the container.
+
 `mg-pipeline` is a Python orchestration tool that drives the
 MadGraph→MadSpin→Pythia→Rivet pipeline. It is maintained in the
 [mg-pipeline](https://github.com/iakovts/mg-pipeline) repository and is designed
