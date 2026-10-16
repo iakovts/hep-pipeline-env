@@ -152,11 +152,11 @@ build_rivet() {
 }
 
 # Download and compile pythia
-# https://pythia.org/download/pythia83/pythia8316.tgz
+# https://pythia.org/releases/pythia83/pythia8316.tgz
 build_pythia() {
   local version="8316"
   local archive="pythia${version}.tgz"
-  local url="https://www.pythia.org/download/pythia83/${archive}" 
+  local url="https://pythia.org/releases/pythia83/${archive}"
   fetch_and_unpack "$url" "$archive" || return 1
   run_step cd "pythia${version}" || return 1
   run_step ./configure --prefix="$PWD/gcc620_x86_64-slc6" \
