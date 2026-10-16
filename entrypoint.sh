@@ -40,7 +40,16 @@ fi
 chown "$USER_ID":"$GROUP_ID" /home/madgraph/.bashrc
 
 if [ ! -f /madgraph/.bootstrap_done ]; then
-    gosu madgraph bash -lc 'cd /madgraph && source /madgraph/compile_all.sh'
+    # Keep it novice-friendly: on failure just stop with a clear message.
+    # Re-running ./bootstrap.sh resumes from the failed step.
+    if ! gosu madgraph bash -lc 'cd /madgraph && source /madgraph/compile_all.sh'; then
+        echo "" >&2
+        echo "ERROR: The HEP library build did not finish." >&2
+        echo "Please run ./bootstrap.sh again to retry - already completed steps are skipped." >&2
+        exit 1
+    fi
 fi
 
-exec gosu madgraph bash -lc 'cd /madgraph && source /madgraph/compile_all.sh >/dev/null 2>&1 || true; exec "$@"' _ "$@"
+# Only source for env setup when the build completed; otherwise this would
+# silently re-attempt the build with output hidden.
+exec gosu madgraph bash -lc 'if [ -f /madgraph/.bootstrap_done ]; then source /madgraph/compile_all.sh >/dev/null 2>&1; fi; exec "$@"' _ "$@"

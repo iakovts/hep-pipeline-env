@@ -21,9 +21,20 @@ MARKER_FILE="$BASEDIR/.bootstrap_done"
 #   lsetup "root 6.14.04-x86_64-slc6-gcc62-opt"
 # fi
 
+# Download and unpack a tarball into $BASEDIR.
+# Usage: fetch_and_unpack <url> <archive> [extracted_dir]
+# If [extracted_dir] already exists the download/unpack is skipped (resume support).
 fetch_and_unpack() {
   local url="$1"
   local archive="$2"
+  local dir="${3:-}"
+  # Always start from BASEDIR: a previously failed step may have left the
+  # shell inside a build subdirectory (the script is sourced).
+  run_step cd "$BASEDIR" || return 1
+  if [[ -n "$dir" && -d "$BASEDIR/$dir" ]]; then
+    echo "$dir already extracted - skipping download"
+    return 0
+  fi
   run_step wget "$url" -O "$archive" || return 1
   run_step tar -xf "$archive" || return 1
   rm -f "$archive"
@@ -43,8 +54,12 @@ get_root() {
   local version="6.36.04"
   local archive="root_v${version}.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz"
   local url="https://root.cern/download/${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
-  echo "ROOT Version: ${version} downloaded and extracted"
+  if [[ -r "$BASEDIR/root/bin/thisroot.sh" ]]; then
+    echo "ROOT ${version} already present - skipping download"
+  else
+    fetch_and_unpack "$url" "$archive" "root" || return 1
+    echo "ROOT Version: ${version} downloaded and extracted"
+  fi
   # ROOT tarballs extract to a directory called "root"
   source "$BASEDIR/root/bin/thisroot.sh"
   echo "ROOT environment set up. ROOTSYS=${ROOTSYS}"
@@ -54,8 +69,9 @@ get_root() {
 get_madgraph() {
   local version="3.5.13"
   local archive="MG5_aMC_v${version}.tar.gz"
+  local dir="MG5_aMC_v3_5_13"
   local url="https://launchpad.net/mg5amcnlo/3.0/3.6.x/+download/${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
+  fetch_and_unpack "$url" "$archive" "$dir" || return 1
   echo "MadGraph Version: ${version} downloaded and extracted"
 }
 
@@ -65,13 +81,17 @@ build_lhapdf() {
   local version="6.5.5"
   local archive="LHAPDF-${version}.tar.gz"
   local url="https://lhapdf.hepforge.org/downloads/?f=${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
-  run_step cd "LHAPDF-${version}" || return 1
-  run_step ./configure PYTHON=python3 --prefix="$PWD/gcc620_x86_64-slc6" || return 1
-  run_step make -j12 || return 1
-  run_step make install || return 1
-  export PATH="$PATH:$PWD/gcc620_x86_64-slc6/bin"
-  run_step cd "$BASEDIR" || return 1
+  if [[ -d "$BASEDIR/LHAPDF-${version}/gcc620_x86_64-slc6" ]]; then
+    echo "LHAPDF ${version} already built - skipping"
+  else
+    fetch_and_unpack "$url" "$archive" "LHAPDF-${version}" || return 1
+    run_step cd "LHAPDF-${version}" || return 1
+    run_step ./configure PYTHON=python3 --prefix="$PWD/gcc620_x86_64-slc6" || return 1
+    run_step make -j12 || return 1
+    run_step make install || return 1
+    run_step cd "$BASEDIR" || return 1
+  fi
+  export PATH="$PATH:$BASEDIR/LHAPDF-${version}/gcc620_x86_64-slc6/bin"
 }
 
 # Download and compile YODA
@@ -80,7 +100,11 @@ build_yoda() {
   local version="2.1.1"
   local archive="YODA-${version}.tar.gz"
   local url="https://yoda.hepforge.org/downloads/?f=${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
+  if [[ -d "$BASEDIR/YODA-${version}/gcc620_x86_64-slc6" ]]; then
+    echo "YODA ${version} already built - skipping"
+    return 0
+  fi
+  fetch_and_unpack "$url" "$archive" "YODA-${version}" || return 1
   run_step cd "YODA-${version}" || return 1
   run_step ./configure --prefix="$PWD/gcc620_x86_64-slc6" --enable-root || return 1
   run_step make -j12 || return 1
@@ -94,7 +118,11 @@ build_fastjet() {
   local version="3.4.0"
   local archive="fastjet-${version}.tar.gz"
   local url="http://fastjet.fr/repo/${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
+  if [[ -d "$BASEDIR/fastjet-${version}/gcc620_x86_64-slc6" ]]; then
+    echo "fastjet ${version} already built - skipping"
+    return 0
+  fi
+  fetch_and_unpack "$url" "$archive" "fastjet-${version}" || return 1
   run_step cd "fastjet-${version}" || return 1
   run_step ./configure --enable-allcxxplugins --prefix="$PWD/gcc620_x86_64-slc6" || return 1
   run_step make -j12 || return 1
@@ -108,7 +136,11 @@ build_fjcontrib() {
   local version="1.056"
   local archive="fjcontrib-${version}.tar.gz"
   local url="http://fastjet.hepforge.org/contrib/downloads/${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
+  if [[ -d "$BASEDIR/fjcontrib-${version}/gcc620_x86_64-slc6" ]]; then
+    echo "fjcontrib ${version} already built - skipping"
+    return 0
+  fi
+  fetch_and_unpack "$url" "$archive" "fjcontrib-${version}" || return 1
   run_step cd "fjcontrib-${version}" || return 1
   run_step ./configure --prefix="$PWD/gcc620_x86_64-slc6" --fastjet-config="$BASEDIR/fastjet-3.4.0/gcc620_x86_64-slc6/bin/fastjet-config" || return 1
   run_step make -j12 || return 1
@@ -123,9 +155,13 @@ build_hepmc3() {
   local version="3.3.1"
   local archive="HepMC3-${version}.tar.gz"
   local url="http://hepmc.web.cern.ch/hepmc/releases/${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
+  if [[ -d "$BASEDIR/HepMC3-${version}/build/gcc620_x86_64-slc6" ]]; then
+    echo "HepMC3 ${version} already built - skipping"
+    return 0
+  fi
+  fetch_and_unpack "$url" "$archive" "HepMC3-${version}" || return 1
   run_step cd "HepMC3-${version}" || return 1
-  run_step mkdir build || return 1
+  run_step mkdir -p build || return 1
   run_step cd build || return 1
   run_step cmake -DCMAKE_INSTALL_PREFIX="$PWD/gcc620_x86_64-slc6" -DHEPMC3_ENABLE_ROOTIO:BOOL=OFF -DHEPMC3_ENABLE_PYTHON:BOOL=OFF -Dmomentum:STRING=GEV -Dlength:STRING=MM ../ || return 1
   run_step cmake --build . -j12 || return 1
@@ -139,7 +175,11 @@ build_rivet() {
   local version="4.1.1"
   local archive="Rivet-${version}.tar.gz"
   local url="https://rivet.hepforge.org/downloads/?f=${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
+  if [[ -d "$BASEDIR/Rivet-${version}/gcc620_x86_64-slc6" ]]; then
+    echo "Rivet ${version} already built - skipping"
+    return 0
+  fi
+  fetch_and_unpack "$url" "$archive" "Rivet-${version}" || return 1
   run_step cd "Rivet-${version}" || return 1
   run_step ./configure --prefix="$PWD/gcc620_x86_64-slc6" \
     --with-yoda="$BASEDIR/YODA-2.1.1/gcc620_x86_64-slc6" \
@@ -157,7 +197,11 @@ build_pythia() {
   local version="8316"
   local archive="pythia${version}.tgz"
   local url="https://pythia.org/releases/pythia83/${archive}"
-  fetch_and_unpack "$url" "$archive" || return 1
+  if [[ -d "$BASEDIR/pythia${version}/gcc620_x86_64-slc6" ]]; then
+    echo "Pythia ${version} already built - skipping"
+    return 0
+  fi
+  fetch_and_unpack "$url" "$archive" "pythia${version}" || return 1
   run_step cd "pythia${version}" || return 1
   run_step ./configure --prefix="$PWD/gcc620_x86_64-slc6" \
     --with-fastjet3="$BASEDIR/fastjet-3.4.0/gcc620_x86_64-slc6" \
@@ -220,6 +264,7 @@ post_build() {
   run_step cd "$BASEDIR" || return 1
 
   echo "Cloning LHC-DMWG model repository into MadGraph models..."
+  rm -rf /tmp/model-repository
   run_step git clone https://github.com/LHC-DMWG/model-repository.git /tmp/model-repository || return 1
   run_step mkdir -p "$BASEDIR/MG5_aMC_v3_5_13/models" || return 1
   run_step cp -r /tmp/model-repository/models/. "$BASEDIR/MG5_aMC_v3_5_13/models/" || return 1
@@ -244,6 +289,13 @@ main() {
   touch "$MARKER_FILE"
   echo "compile_all.sh script finished"
 }
+
+# When sourced with --functions-only, just define the functions above and skip
+# building / env setup. Useful for re-running a single step after an error:
+#   source compile_all.sh --functions-only && build_pythia
+if [[ "${1:-}" == "--functions-only" ]]; then
+  return 0
+fi
 
 if [[ -f "$MARKER_FILE" ]]; then
   setup_env

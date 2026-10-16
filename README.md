@@ -384,13 +384,26 @@ Check that `PUID`/`PGID` in `docker-compose.yml` match your host user. Run
 
 ### Compilation fails mid-way
 
-The script sources all build functions into your shell. You can re-run just
-the failing step:
+Nothing to fix by hand — just run the bootstrap again:
 
 ```bash
-source compile_all.sh   # loads the functions
-build_pythia             # re-run only Pythia
+./bootstrap.sh
 ```
+
+Completed steps are skipped (each library's install directory is detected), so
+the build resumes from the step that failed.
+
+<details>
+<summary>Advanced: re-run a single build step by hand</summary>
+
+```bash
+source compile_all.sh --functions-only   # define the functions, build nothing
+build_pythia                             # re-run only Pythia
+```
+
+To force a rebuild of one library, delete its install directory first (e.g.
+`mg5_data/pythia8316/gcc620_x86_64-slc6`).
+</details>
 
 ### Container lost environment after restart
 
