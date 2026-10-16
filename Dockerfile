@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu sudo \
     && rm -rf /var/lib/apt/lists/*
 
+# Python dependencies for MadGraph / mg-pipeline. Installed system-wide at
+# build time so they survive container recreation - a runtime
+# `pip install --user` lands in the container's ephemeral home directory.
+RUN python3 -m pip install --no-cache-dir six matplotlib
+
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 

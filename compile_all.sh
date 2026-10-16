@@ -255,8 +255,16 @@ setup_env() {
 
 # Compile Pythia examples needed by the pipeline
 post_build() {
+  # six/matplotlib are baked into the container image (Dockerfile /
+  # madgraph.def) so they survive container recreation. Install them here
+  # only if missing - this is a fallback for images built before that change.
   echo "Installing Python dependencies..."
-  python -m pip install six matplotlib --user || return 1
+  if python -c "import six, matplotlib" 2>/dev/null; then
+    echo "six and matplotlib already available - skipping"
+  else
+    python -m pip install six matplotlib --user || \
+      echo "WARNING: could not install six/matplotlib (offline?). They are expected to be part of the container image." >&2
+  fi
 
   echo "Compiling Pythia examples..."
   run_step cd "$BASEDIR/pythia8316/examples" || return 1

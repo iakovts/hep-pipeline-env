@@ -49,6 +49,12 @@ From: ubuntu:22.04
         git
     rm -rf /var/lib/apt/lists/*
 
+    # Python dependencies for MadGraph / mg-pipeline. Installed into the image
+    # at build time so they survive container recreation - a runtime
+    # `pip install --user` would land in an ephemeral home directory (on Docker)
+    # and is only a fallback in compile_all.sh.
+    python3 -m pip install --no-cache-dir six matplotlib
+
 %runscript
     # Default entry: source the HEP environment and drop into bash.
     # The working directory and compile_all.sh are expected to be

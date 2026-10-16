@@ -382,6 +382,19 @@ environment setup automatically. Logs go to `logs/pipeline_<jobid>.out`.
 Check that `PUID`/`PGID` in `docker-compose.yml` match your host user. Run
 `id -u` and `id -g` to find your UID and GID.
 
+### MadGraph errors with `six` / `ModuleNotFoundError: No module named 'six'`
+
+The `six` and `matplotlib` Python packages are part of the container image
+(`Dockerfile` / `madgraph.def`). If you hit this error, you are running an
+image built before that change — rebuild it:
+
+```bash
+docker compose build   # then: ./bootstrap.sh
+```
+
+On the HPC, delete `madgraph.sif` and run `bash hpc_bootstrap.sh` again to
+rebuild the image.
+
 ### Compilation fails mid-way
 
 Nothing to fix by hand — just run the bootstrap again:
